@@ -727,6 +727,7 @@ def predict_random_forest(model, data: pd.DataFrame, periods: int = 30) -> np.nd
 
     except Exception as e:
         raise Exception(f"Random Forest prediction failed: {str(e)}")
+
         
 def train_lstm_model(data: pd.DataFrame) -> Tuple[object, object]:
     try:
