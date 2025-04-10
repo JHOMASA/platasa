@@ -28,6 +28,7 @@ from sklearn.preprocessing import MinMaxScaler
 import uuid
 from scipy.signal import savgol_filter
 import plotly.graph_objects as go
+from pmdarima import auto_arima
 # Configuration
 
 ALPHA_VANTAGE_API_KEY = "QDRRN1Y7K4EDJYT2"
