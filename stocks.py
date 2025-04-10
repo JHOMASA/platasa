@@ -745,36 +745,39 @@ def predict_random_forest(model, data: pd.DataFrame, periods: int = 30) -> np.nd
         
     except Exception as e:
         raise Exception(f"Random Forest prediction failed: {str(e)}")
+        
 def train_lstm_model(data: pd.DataFrame) -> Tuple[object, object]:
-    """Basic LSTM model training"""
     try:
         from sklearn.preprocessing import MinMaxScaler
         from tensorflow.keras.models import Sequential
-        from tensorflow.keras.layers import LSTM, Dense
-        
-        # Scale data
+        from tensorflow.keras.layers import LSTM, Dense, Dropout
+        from tensorflow.keras.callbacks import EarlyStopping
+
         scaler = MinMaxScaler()
         scaled_data = scaler.fit_transform(data[['Close']].values)
-        
-        # Prepare sequences
+
         X, y = [], []
-        n_lookback = 60  # Number of days to look back
+        n_lookback = 60
         for i in range(n_lookback, len(scaled_data)):
-            X.append(scaled_data[i-n_lookback:i, 0])
+            X.append(scaled_data[i - n_lookback:i, 0])
             y.append(scaled_data[i, 0])
-        
+
         X, y = np.array(X), np.array(y)
         X = np.reshape(X, (X.shape[0], X.shape[1], 1))
-        
-        # Build model
+
         model = Sequential()
-        model.add(LSTM(50, return_sequences=True, input_shape=(X.shape[1], 1)))
-        model.add(LSTM(50))
+        model.add(LSTM(60, return_sequences=True, input_shape=(X.shape[1], 1)))
+        model.add(Dropout(0.2))
+        model.add(LSTM(60))
+        model.add(Dropout(0.2))
         model.add(Dense(1))
         model.compile(optimizer='adam', loss='mean_squared_error')
-        model.fit(X, y, epochs=20, batch_size=32, verbose=0)
-        
+
+        early_stop = EarlyStopping(monitor='loss', patience=5, restore_best_weights=True)
+        model.fit(X, y, epochs=50, batch_size=32, verbose=0, callbacks=[early_stop])
+
         return model, scaler
+
     except Exception as e:
         raise Exception(f"LSTM training failed: {str(e)}")
 
@@ -798,14 +801,13 @@ def predict_lstm(model, scaler, data: pd.DataFrame, periods: int = 30) -> np.nda
 
 
 def train_arima_model(data: pd.DataFrame) -> object:
-    """Train ARIMA model"""
     try:
-        from statsmodels.tsa.arima.model import ARIMA
-        model = ARIMA(data['Close'], order=(5,1,0))
-        model_fit = model.fit()
-        return model_fit
+        from pmdarima import auto_arima
+        model = auto_arima(data['Close'], seasonal=False, trace=False, suppress_warnings=True)
+        return model
     except Exception as e:
         raise Exception(f"ARIMA training failed: {str(e)}")
+
 
 def predict_arima(model, periods: int = 30) -> pd.Series:
     """Generate ARIMA predictions"""
@@ -816,40 +818,52 @@ def predict_arima(model, periods: int = 30) -> pd.Series:
         raise Exception(f"ARIMA prediction failed: {str(e)}")
 
 def train_xgboost_model(data: pd.DataFrame) -> object:
-    """Train XGBoost model"""
     try:
         from xgboost import XGBRegressor
-        from sklearn.preprocessing import MinMaxScaler
-        
-        # Create features (using lagged values)
+
         df = data.copy()
         for i in range(1, 31):
             df[f'lag_{i}'] = df['Close'].shift(i)
+        df['dayofweek'] = df.index.dayofweek
+        df['month'] = df.index.month
         df.dropna(inplace=True)
-        
+
         X = df.drop(columns=['Close'])
         y = df['Close']
-        
-        model = XGBRegressor(n_estimators=100)
+
+        model = XGBRegressor(n_estimators=200, learning_rate=0.05, max_depth=5, random_state=42)
         model.fit(X, y)
         return model
     except Exception as e:
         raise Exception(f"XGBoost training failed: {str(e)}")
 
 def predict_xgboost(model, data: pd.DataFrame, periods: int = 30) -> np.ndarray:
-    """Generate XGBoost predictions"""
     try:
-        # Create future dataframe with lagged values
-        future = data.copy()
-        for i in range(1, periods+1):
-            if i == 1:
-                future.loc[future.index[-1] + pd.Timedelta(days=1), 'Close'] = np.nan
-            future[f'lag_{i}'] = future['Close'].shift(i)
-        
-        # Predict
-        X_pred = future.drop(columns=['Close']).iloc[-periods:]
-        predictions = model.predict(X_pred)
-        return predictions
+        df = data.copy()
+        for i in range(1, 31):
+            df[f'lag_{i}'] = df['Close'].shift(i)
+        df['dayofweek'] = df.index.dayofweek
+        df['month'] = df.index.month
+        df.dropna(inplace=True)
+
+        future = df.iloc[-1:].copy()
+        predictions = []
+
+        for _ in range(periods):
+            x_input = future.drop(columns=['Close']).values
+            pred = model.predict(x_input)[0]
+            predictions.append(pred)
+
+            # Update input for next prediction
+            new_row = future.iloc[0].copy()
+            for i in range(30, 1, -1):
+                new_row[f'lag_{i}'] = new_row[f'lag_{i-1}']
+            new_row['lag_1'] = pred
+            new_row['Close'] = pred
+            new_row['dayofweek'] = (new_row['dayofweek'] + 1) % 7
+            future = pd.DataFrame([new_row])
+
+        return np.array(predictions)
     except Exception as e:
         raise Exception(f"XGBoost prediction failed: {str(e)}")
 
