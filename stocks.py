@@ -1617,7 +1617,7 @@ def main():
                                         "📥 Download Summary CSV", 
                                         data=csv,
                                         file_name=f"simulated_vs_Historical_risk_metrics_table{ticker}_{smoothing_method}.csv",
-                                        mime="text/csv"
+                                        mime="text/csv",
                                         help="Download the summary metrics as a CSV file"
                                     )
                                 else:
