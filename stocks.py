@@ -315,7 +315,7 @@ def prepare_display_data(ratios: Dict[str, Any]) -> Dict[str, float]:
         if api_key in ratios and ratios[api_key] is not None:
             try:
                 value = float(ratios[api_key])
-                if display_name in ["ROE", "ROA"] and value <= 1.0)
+                if display_name in ["ROE", "ROA"] and value <= 1.0):
                     value *= 100
                 display_data[display_name] = value
             except(TypeError, ValueError):
