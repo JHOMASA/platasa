@@ -1427,13 +1427,7 @@ def main():
                         "% Positive Returns": f"{np.mean(tir_array > 0) * 100:.2f}%"
                     }])
                     st.dataframe(df_summary, use_container_width=True)
-                    csv = df_summary.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        "📥 Download Summary CSV",
-                        data=csv,file_name=f"monte_carlo_summary_{ticker}_{smoothing_method}.csv",
-                        mime="text/csv",
-                        help="Download the summary metrics as a CSV file"
-                    )
+                
                 else:
                     st.warning("No data available for selected smoothing method.")
 
