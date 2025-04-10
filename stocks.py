@@ -242,34 +242,34 @@ def get_cached_sector_averages(sector: str) -> Dict[str, float]:
     
     return DEFAULTS.get(sector, DEFAULTS['General'])
 
-def get_yahoo_ratios(ticker: str, fmp_api_key: str = None) -> Dict[str, Any]:
-    """Get financial ratios from Yahoo Finance, with Alpha Vantage fallback for ROE and ROA"""
+def get_yahoo_ratios(ticker: str, fmp_api_key: str = None) -> Dict[str, Any]:  # Added fmp_api_key parameter
+    """Get financial ratios from Yahoo Finance"""
     try:
         yf_ticker = yf.Ticker(ticker)
         info = yf_ticker.info
-
-        if not info:
+        
+        if not info:    
             st.error("No financial data available for this ticker")
             return None
-
-        # Extract Yahoo Finance ratios
+            
+        # Extract relevant ratios
         ratios = {
             'priceEarningsRatio': info.get('trailingPE'),
             'priceToBookRatio': info.get('priceToBook'),
             'debtEquityRatio': info.get('debtToEquity'),
             'currentRatio': info.get('currentRatio'),
-            'returnOnEquity': None,
-            'returnOnAssets': None
+            'returnOnEquity': info.get('returnOnEquity'),  # Fixed typo in key
+            'returnOnAssets': info.get('returnOnAssets')
         }
-
-        # Fallback to Alpha Vantage for ROE and ROA only
-        av_ratios = get_alpha_vantage_ratios(ticker)
-        if av_ratios:
-            ratios['returnOnEquity'] = av_ratios.get('ROE')
-            ratios['returnOnAssets'] = av_ratios.get('ROA')
-
+        
+        # Add FMP fallback if needed
+        if ratios['returnOnEquity'] is None or ratios['returnOnAssets'] is None:
+            av_ratios = get_alpha_vantage_ratios(ticker)
+            if av_ratios:
+                ratios['returnOnEquity'] = ratios['returnOnEquity'] or av_ratios['returnOnEquity']
+                ratios['returnOnAssets'] = ratios['returnOnAssets'] or av_ratios['returnOnAssets']
+        
         return {k: float(v) if v is not None else None for k, v in ratios.items()}
-
     except Exception as e:
         st.error(f"Error fetching ratios: {str(e)}")
         return None
@@ -356,6 +356,23 @@ def create_dynamic_chart(display_data: Dict[str, float], ticker: str,
         height=max(400, len(display_data) * 60)  # Dynamic height
     )
     st.plotly_chart(fig, use_container_width=True)
+                            
+def get_alpha_vantage_ratios(ticker: str) -> Dict[str, Optional[float]]:
+    """Ensures proper decimal conversion from API"""
+    ratios = {"ROE": None, "ROA": None}
+    try:
+        # ... API call code ...
+        
+        # These values are already in percentage form from API (e.g., 15.25 means 15.25%)
+        # So we divide by 100 to convert to decimal (0.1525)
+        if "ReturnOnEquityTTM" in data:
+            ratios["ROE"] = safe_float(data["ReturnOnEquityTTM"], div_by=100)
+        if "ReturnOnAssetsTTM" in data:
+            ratios["ROA"] = safe_float(data["ReturnOnAssetsTTM"], div_by=100)
+            
+    except Exception as e:
+        st.error(f"Error: {str(e)}")
+    return ratios
 
 
 def show_metric_analysis(display_data: Dict[str, float], sector_avgs: Dict[str, float]):
@@ -984,6 +1001,131 @@ def display_monte_carlo(simulations: dict, smoothing_method: str):
     else:
         st.warning("No valid simulation data for risk metrics.")
 
+def display_financial_ratios(ratios: Dict[str, Any], ticker: str):
+    """
+    Displays financial ratios from FMP API data
+    Args:
+        ratios: Dictionary from FMP's /v3/ratios endpoint
+        ticker: Stock ticker symbol for display purposes
+    """
+    try:
+        if not ratios:
+            st.error("No ratio data available")
+            return
+        if 'go' not in globals():
+            raise ImportError("Plotly graph_objects not imported properly")
+            
+        # Create the figure safely
+        fig = go.Figure()  # This will now work
+
+        # FMP field to display name mapping
+        ratio_map = {
+            'priceEarningsRatio': 'P/E Ratio',
+            'priceToBookRatio': 'P/B Ratio',
+            'debtEquityRatio': 'Debt/Equity',
+            'currentRatio': 'Current Ratio',
+            'returnOnEquity': 'ROE',
+            'returnOnAssets': 'ROA'
+        }
+
+        # Mock sector averages (replace with actual FMP sector data)
+        sector_avg = {
+            'priceEarningsRatio': 15.2,
+            'priceToBookRatio': 2.8,
+            'debtEquityRatio': 0.85,
+            'currentRatio': 1.5,
+            'returnOnEquity': 0.15,
+            'returnOnAssets': 0.075
+        }
+
+        # Prepare display data
+        display_data = {}
+        for api_key, display_name in ratio_map.items():
+            if api_key in ratios and ratios[api_key] is not None:
+                # Convert decimals to percentages for ROE/ROA
+                if display_name in ['ROE', 'ROA']:
+                    display_data[display_name] = f"{ratios[api_key] * 100:.2f}%"
+                else:
+                    display_data[display_name] = f"{ratios[api_key]:.2f}"
+
+        if not display_data:
+            st.error("No valid ratio data available for display")
+            return
+
+        # Create visualization
+        st.subheader(f"Financial Ratios for {ticker}")
+        
+        # Bar chart
+        fig = go.Figure()
+        
+        # Add company bars
+        fig.add_trace(go.Bar(
+            x=list(display_data.keys()),
+            y=[float(v.strip('%')) if '%' in v else float(v) for v in display_data.values()],
+            name=ticker,
+            text=list(display_data.values()),
+            textposition='auto'
+        ))
+        
+        # Add sector average bars (only for available metrics)
+        sector_x = []
+        sector_y = []
+        for display_name in display_data.keys():
+            api_key = next(k for k, v in ratio_map.items() if v == display_name)
+            if api_key in sector_avg:
+                sector_x.append(display_name)
+                if display_name in ['ROE', 'ROA']:
+                    sector_y.append(sector_avg[api_key] * 1)
+                else:
+                    sector_y.append(sector_avg[api_key])
+        
+        fig.add_trace(go.Bar(
+            x=sector_x,
+            y=sector_y,
+            name='Sector Average',
+            text=[f"{y:.1f}{'%' if x in ['ROE', 'ROA'] else ''}" for x, y in zip(sector_x, sector_y)],
+            textposition='auto'
+        ))
+        
+        fig.update_layout(
+            barmode='group',
+            title=f"{ticker} vs Sector Averages",
+            yaxis_title="Value"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Metric analysis
+        st.subheader("Metric Analysis")
+        
+        cols = st.columns(2)
+        with cols[0]:
+            if 'P/E Ratio' in display_data:
+                pe = float(display_data['P/E Ratio'])
+                st.metric("P/E Ratio", 
+                         display_data['P/E Ratio'],
+                         f"{'High' if pe > 20 else 'Normal' if pe > 10 else 'Low'} vs market")
+            
+            if 'Current Ratio' in display_data:
+                cr = float(display_data['Current Ratio'])
+                st.metric("Current Ratio", 
+                         display_data['Current Ratio'],
+                         "Strong" if cr > 2 else "Adequate" if cr > 1 else "Weak")
+        
+        with cols[1]:
+            if 'Debt/Equity' in display_data:
+                de = float(display_data['Debt/Equity'])
+                st.metric("Debt/Equity", 
+                         display_data['Debt/Equity'],
+                         "High" if de > 1 else "Moderate" if de > 0.5 else "Low")
+            
+            if 'ROE' in display_data:
+                roe = float(display_data['ROE'].strip('%'))
+                st.metric("Return on Equity", 
+                         display_data['ROE'],
+                         "Strong" if roe > 15 else "Average" if roe > 8 else "Weak")
+
+    except Exception as e:
+        st.error(f"Error displaying ratios: {str(e)}")
 
 def display_predictions(historical_data, predictions, model_name):
     fig = go.Figure()
@@ -1293,7 +1435,7 @@ def main():
 
     
                  
-        elif analysis_type == "Financial Ratios":
+      elif analysis_type == "Financial Ratios":
             st.header("📈 Financial Ratios Analysis")
 
             # Create tabs for different ratio types
@@ -1479,7 +1621,7 @@ def main():
 
            
         
-        elif analysis_type == "Predictions":
+     elif analysis_type == "Predictions":
             st.header("🔮 Price Predictions")
     
             col1, col2 = st.columns(2)
