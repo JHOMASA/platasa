@@ -317,7 +317,7 @@ def prepare_display_data(ratios: Dict[str, Any]) -> Dict[str, float]:
                 value = float(ratios[api_key])
                 if display_name in ["ROE", "ROA"] and value < 1:
                     value *= 100
-                display_data[display_name] = value
+                display_data[display_name] = round(value,2)
             except(TypeError, ValueError):
                 continue
     return display_data
