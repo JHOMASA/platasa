@@ -31,7 +31,6 @@ import plotly.graph_objects as go
 from pmdarima import auto_arima
 # Configuration
 
-ALPHA_VANTAGE_API_KEY = "QDRRN1Y7K4EDJYT2"
 
 
 st.set_page_config(layout="wide")
