@@ -3,7 +3,6 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import requests
-import plotly.graph_objects as go
 from textblob import TextBlob
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
@@ -28,7 +27,7 @@ from typing import  Dict, Any,Tuple, Optional,List
 from sklearn.preprocessing import MinMaxScaler
 import uuid
 from scipy.signal import savgol_filter
-
+import plotly.graph_objects as go
 
 # Configuration
 
