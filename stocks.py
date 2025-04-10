@@ -1612,6 +1612,14 @@ def main():
                                 if metrics:
                                     df_metrics = pd.DataFrame(metrics)
                                     st.dataframe(df_metrics, use_container_width=True)
+                                    csv = df_summary.to_csv(index=False).encode('utf-8')
+                                    st.download_button(
+                                        "📥 Download Summary CSV", 
+                                        data=csv,
+                                        file_name=f"simulated_vs_Historical_risk_metrics_table{ticker}_{smoothing_method}.csv",
+                                        mime="text/csv"
+                                        help="Download the summary metrics as a CSV file"
+                                    )
                                 else:
                                     st.info("No simulation output available for risk table.")
                         
