@@ -1,3 +1,35 @@
+import streamlit as st
+import yfinance as yf
+import pandas as pd
+import numpy as np
+import requests
+import plotly.graph_objects as go
+from textblob import TextBlob
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+from io import BytesIO
+import base64
+import json
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense
+from xgboost import XGBRegressor
+from statsmodels.tsa.arima.model import ARIMA
+from prophet import Prophet
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+import time
+import random
+from sklearn.metrics import mean_absolute_error
+from functools import lru_cache
+import requests
+from typing import  Dict, Any,Tuple, Optional,List
+from sklearn.preprocessing import MinMaxScaler
+import uuid
+from scipy.signal import savgol_filter
+
+
 # Configuration
 
 ALPHA_VANTAGE_API_KEY = "QDRRN1Y7K4EDJYT2"
