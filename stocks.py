@@ -810,10 +810,8 @@ def train_arima_model(data: pd.DataFrame) -> object:
 
 
 def predict_arima(model, periods: int = 30) -> pd.Series:
-    """Generate ARIMA predictions"""
     try:
-        predictions = model.forecast(steps=periods)
-        return predictions
+        return model.predict(n_periods=periods)
     except Exception as e:
         raise Exception(f"ARIMA prediction failed: {str(e)}")
 
