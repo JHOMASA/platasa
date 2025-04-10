@@ -678,71 +678,53 @@ def create_lagged_features(data: pd.DataFrame, lags: int = 34) -> pd.DataFrame:
     return df
 
 def train_random_forest(data: pd.DataFrame) -> object:
-    """Train Random Forest model with exactly 34 features"""
     try:
         from sklearn.ensemble import RandomForestRegressor
-        
-        # Create features - will produce 34 lag features + Close price
+
         df = create_lagged_features(data, lags=34)
-        
-        # Verify feature count (34 lag features + Close = 35 columns total)
-        if len(df.columns) != 35:
-            raise ValueError(f"Feature count mismatch. Expected 35 columns (Close + 34 lags), got {len(df.columns)}")
-            
-        # Prepare features (34 lag features) and target (Close price)
-        X = df.drop(columns=['Close'])  # This should be exactly 34 features
+        df['dayofweek'] = df.index.dayofweek
+        df['month'] = df.index.month
+
+        if len(df.columns) != 37:
+            raise ValueError(f"Feature count mismatch. Expected 37, got {len(df.columns)}")
+
+        X = df.drop(columns=['Close'])
         y = df['Close']
-        
-        # Verify X has exactly 34 features
-        if X.shape[1] != 34:
-            raise ValueError(f"Expected 34 features, got {X.shape[1]}")
-        
-        # Train model
+
         model = RandomForestRegressor(
-            n_estimators=100,
-            max_depth=10,
+            n_estimators=200,
+            max_depth=12,
             random_state=42,
             n_jobs=-1
         )
         model.fit(X, y)
-        
         return model
-        
+
     except Exception as e:
         raise Exception(f"Random Forest training failed: {str(e)}")
 
+
 def predict_random_forest(model, data: pd.DataFrame, periods: int = 30) -> np.ndarray:
-    """Generate predictions using the trained Random Forest model"""
     try:
-        # Create working copy of data
         current_data = data.copy()
         if 'Date' in current_data.columns:
             current_data = current_data.set_index('Date')
-            
-        # Verify sufficient history (need at least 34 previous values)
-        if len(current_data) < 34:
-            raise ValueError(f"Need at least 34 days of history, got {len(current_data)}")
-            
+
         predictions = []
-        
         for _ in range(periods):
-            # Create feature vector with exactly 34 lagged values
-            latest_features = [current_data['Close'].iloc[-i] for i in range(1, 35)]
-            
-            # Make prediction
-            pred = model.predict([latest_features])[0]
+            df = create_lagged_features(current_data, lags=34)
+            df['dayofweek'] = df.index.dayofweek
+            df['month'] = df.index.month
+            x_input = df.drop(columns=['Close']).iloc[-1].values.reshape(1, -1)
+            pred = model.predict(x_input)[0]
             predictions.append(pred)
-            
-            # Update data with new prediction
-            new_date = current_data.index[-1] + pd.Timedelta(days=1)
-            new_row = pd.DataFrame({'Close': [pred]}, index=[new_date])
+
+            next_date = current_data.index[-1] + pd.Timedelta(days=1)
+            new_row = pd.DataFrame({'Close': [pred]}, index=[next_date])
             current_data = pd.concat([current_data, new_row])
-        
+
         return np.array(predictions)
-        
-    except Exception as e:
-        raise Exception(f"Random Forest prediction failed: {str(e)}")
-        
+
     except Exception as e:
         raise Exception(f"Random Forest prediction failed: {str(e)}")
         
